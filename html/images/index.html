@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>TMG Inventory</title>
+        <title>QB Inventory</title>
         <link rel="stylesheet" href="main.css" />
         <link rel="stylesheet" href="https://unpkg.com/floating-vue@5.2.2/dist/style.css" />
         <script src="https://kit.fontawesome.com/d37231be1f.js" crossorigin="anonymous"></script>
@@ -17,8 +17,6 @@
     <body>
         <div id="app">
             <div class="inventory-container" v-if="isInventoryOpen" @mousemove="drag" @mouseup="endDrag" @mousedown="containerMouseDownAction">
-                
-                <!-- Player Inventory Section -->
                 <div class="inventory-section player-inventory-section" :class="{ 'centered-inventory-section': shouldCenterInventory }">
                     <div class="inventory-header">
                         <div class="labels-container">
@@ -35,16 +33,7 @@
                     </div>
                     <div class="inventory-grid">
                         <div class="item-grid">
-                            <div 
-                                v-for="slot in totalSlots" 
-                                :key="slot" 
-                                class="item-slot" 
-                                :id="'slot-' + slot"
-                                :data-slot="slot" 
-                                :class="{ 'invalid-slot-highlight': errorSlot === slot }" 
-                                @dblclick="getItemInSlot(slot, 'player') && useItem(getItemInSlot(slot, 'player'))" 
-                                @mousedown="event => handleMouseDown(event, slot, 'player')"
-                            >
+                            <div v-for="slot in totalSlots" :key="slot" class="item-slot" :data-slot="slot" :class="{ 'invalid-slot-highlight': errorSlot === slot }" @dblclick="getItemInSlot(slot, 'player') && useItem(getItemInSlot(slot, 'player'))" @mousedown="event => handleMouseDown(event, slot, 'player')">
                                 <div class="item-slot-key" v-if="slot <= 5">
                                     <p>{{ slot }}</p>
                                 </div>
@@ -67,12 +56,14 @@
                                     ></div>
                                     <div class="item-slot-durability-fill" v-else style="width: 0%"></div>
                                 </div>
+                                <!-- <div class="item-slot-label" v-if="getItemInSlot(slot, 'player')">
+                                    <p>{{ getItemInSlot(slot, 'player').label }}</p>
+                                </div> -->
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Quantity Transfer Input -->
                 <div class="input-container" v-if="!isOtherInventoryEmpty">
                     <div class="input-wrapper">
                         <input type="number" v-model="transferAmount" min="1" :placeholder="transferAmount === null ? 'amount' : ''" />
@@ -82,7 +73,7 @@
                     </div>
                 </div>
 
-                <!-- Other Inventory Section (Stash / Vehicle / Drop / Shop) -->
+                <!-- Other Inventory Section -->
                 <div class="inventory-section other-inventory-section" v-if="!isOtherInventoryEmpty">
                     <div class="inventory-header">
                         <div class="labels-container">
@@ -90,7 +81,7 @@
                                 <p>{{ otherInventoryLabel }}</p>
                             </div>
                             <div class="current-weight">
-                                <p>{{ (otherInventoryWeight / 1000).toFixed(1) }} / {{ (otherInventoryMaxWeight / 1000).toFixed(1) }}</p>
+                                <p>{{ (otherInventoryWeight / 1000).toFixed(1) }} / {{(otherInventoryMaxWeight / 1000).toFixed(1) }}</p>
                             </div>
                         </div>
                         <div class="weight-bar">
@@ -99,15 +90,7 @@
                     </div>
                     <div class="inventory-grid">
                         <div class="item-grid">
-                            <div 
-                                v-for="slot in otherInventorySlots" 
-                                :key="slot" 
-                                class="item-slot" 
-                                :id="'other-slot-' + slot"
-                                :data-slot="slot" 
-                                @mousedown="event => handleMouseDown(event, slot, 'other')" 
-                                @dragover.prevent
-                            >
+                            <div v-for="slot in otherInventorySlots" :key="slot" class="item-slot" :data-slot="slot" @mousedown="event => handleMouseDown(event, slot, 'other')" @dragover.prevent>
                                 <div class="item-slot-img" v-if="getItemInSlot(slot, 'other')" v-tooltip.right-end="{content: generateTooltipContent(getItemInSlot(slot, 'other')), html: true}">
                                     <img :src="'images/' + getItemInSlot(slot, 'other').image" alt="" />
                                 </div>
@@ -130,13 +113,14 @@
                                     ></div>
                                     <div class="item-slot-durability-fill" v-else style="width: 0%"></div>
                                 </div>
+                                <!-- <div class="item-slot-label" v-if="getItemInSlot(slot, 'other')">
+                                    <p>{{ getItemInSlot(slot, 'other').label }}</p>
+                                </div> -->
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Hotbar Container -->
             <div class="hotbar-container" v-if="showHotbar">
                 <div class="hotbar">
                     <div v-for="slot in 5" :key="slot" class="item-slot">
@@ -168,8 +152,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Item Received/Used Popups -->
             <div class="notification-container" v-if="showNotification">
                 <div class="notification-slot">
                     <div class="notification-title">
@@ -186,8 +168,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Required Item Display -->
             <div class="required-item-container" v-if="showRequiredItems">
                 <div class="required-item">
                     <div v-for="(item, index) in requiredItems" :key="index" class="item-slot">
@@ -200,39 +180,45 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Weapon Attachments Radial Menu -->
             <div class="weapon-attachments" v-if="showWeaponAttachments">
                 <img class="weapon" :src="'images/' + selectedWeapon.image" alt="" />
                 <div class="attachment-slot" v-for="(attachment, i) in selectedWeaponAttachments" :key="i" @click="removeAttachment(attachment)">
                     <img :src="'images/' + attachment.attachment + '.png'" alt="" />
                 </div>
             </div>
-
-            <!-- Context Right-Click Menu -->
-            <!-- Context Right-Click Menu -->
-<ul v-if="showContextMenu" class="context-menu" :style="{ top: contextMenuPosition.top, left: contextMenuPosition.left }" @mousedown.stop>
-    <li v-if="contextMenuItem?.useable" @click="useItem(contextMenuItem)">Use</li>
-    <li @mouseover="showSubmenu = true" @mouseleave="showSubmenu = false">
-        Give
-        <ul v-if="showSubmenu" class="submenu">
-            <li @click="giveItem(contextMenuItem, 1)">Single</li>
-            <li @click="giveItem(contextMenuItem, 'half')">Half</li>
-            <li @click="giveItem(contextMenuItem, 'all')">All</li>
-        </ul>
-    </li>
-    <li @mouseover="showSubmenu = true" @mouseleave="showSubmenu = false">
-        Drop
-        <ul v-if="showSubmenu" class="submenu">
-            <li @click="dropItem(contextMenuItem, 1)">Single</li>
-            <li @click="dropItem(contextMenuItem, 'half')">Half</li>
-            <li @click="dropItem(contextMenuItem, 'all')">All</li>
-        </ul>
-    </li>
-    <li @click="splitAndPlaceItem(contextMenuItem, 'player')">Split</li>
-    <li v-if="contextMenuItem?.name?.includes('weapon_')" @click="copySerial">Copy Serial</li>
-    <li v-if="contextMenuItem?.name?.includes('weapon_')" @click="openWeaponAttachments">Attachments</li>
-</ul>
+            <div v-if="draggedItem" class="item-slot" :class="{ 'dragged-item': draggedItem }" :style="{ top: dragY + 'px', left: dragX + 'px' }">
+                <div class="item-slot-img">
+                    <img :src="'images/' + draggedItem.image" alt="" />
+                </div>
+                <div class="item-slot-amount">
+                    <p>x{{ draggedItem.amount }}</p>
+                </div>
+                <div class="item-slot-label">
+                    <p>{{ draggedItem.label }}</p>
+                </div>
+            </div>
+            <ul v-if="showContextMenu" class="context-menu" :style="{ top: contextMenuPosition.top, left: contextMenuPosition.left }">
+                <li v-if="contextMenuItem.useable" @click="useItem(contextMenuItem)">Use</li>
+                <li @mouseover="showSubmenu = true" @mouseleave="showSubmenu = false">
+                    Give
+                    <ul v-if="showSubmenu" class="submenu">
+                        <li @click="giveItem(contextMenuItem, 1)">Single</li>
+                        <li @click="giveItem(contextMenuItem, 'half')">Half</li>
+                        <li @click="giveItem(contextMenuItem, 'all')">All</li>
+                    </ul>
+                </li>
+                <li @mouseover="showSubmenu = true" @mouseleave="showSubmenu = false">
+                    Drop
+                    <ul v-if="showSubmenu" class="submenu">
+                        <li @click="dropItem(contextMenuItem, 1)">Single</li>
+                        <li @click="dropItem(contextMenuItem, 'half')">Half</li>
+                        <li @click="dropItem(contextMenuItem, 'all')">All</li>
+                    </ul>
+                </li>
+                <li @click="splitAndPlaceItem(contextMenuItem, 'player')">Split</li>
+                <li v-if="contextMenuItem.name.includes('weapon_')" @click="copySerial(contextMenuItem)">Copy Serial</li>
+                <li v-if="contextMenuItem.name.includes('weapon_')" @click="openWeaponAttachments(contextMenuItem)">Attachments</li>
+            </ul>
         </div>
     </body>
 </html>

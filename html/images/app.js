@@ -23,15 +23,23 @@ const InventoryContainer = Vue.createApp({
         },
         weightBarClass() {
             const weightPercentage = (this.playerWeight / this.maxWeight) * 100;
-            if (weightPercentage < 50) return "low";
-            if (weightPercentage < 75) return "medium";
-            return "high";
+            if (weightPercentage < 50) {
+                return "low";
+            } else if (weightPercentage < 75) {
+                return "medium";
+            } else {
+                return "high";
+            }
         },
         otherWeightBarClass() {
             const weightPercentage = (this.otherInventoryWeight / this.otherInventoryMaxWeight) * 100;
-            if (weightPercentage < 50) return "low";
-            if (weightPercentage < 75) return "medium";
-            return "high";
+            if (weightPercentage < 50) {
+                return "low";
+            } else if (weightPercentage < 75) {
+                return "medium";
+            } else {
+                return "high";
+            }
         },
         shouldCenterInventory() {
             return this.isOtherInventoryEmpty;
@@ -45,37 +53,50 @@ const InventoryContainer = Vue.createApp({
     methods: {
         getInitialState() {
             return {
+                // Config Options
                 maxWeight: 0,
                 totalSlots: 0,
+                // Escape Key
                 isInventoryOpen: false,
+                // Single pane
                 isOtherInventoryEmpty: true,
+                // Error handling
                 errorSlot: null,
+                // Player Inventory
                 playerInventory: {},
                 inventoryLabel: "Inventory",
                 totalWeight: 0,
+                // Other inventory
                 otherInventory: {},
                 otherInventoryName: "",
                 otherInventoryLabel: "Drop",
                 otherInventoryMaxWeight: 1000000,
                 otherInventorySlots: 100,
                 isShopInventory: false,
+                // Where item is coming from
                 inventory: "",
+                // Context Menu
                 showContextMenu: false,
                 contextMenuPosition: { top: "0px", left: "0px" },
                 contextMenuItem: null,
                 showSubmenu: false,
+                // Hotbar
                 showHotbar: false,
                 hotbarItems: [],
+                // Notification box
                 showNotification: false,
                 notificationText: "",
                 notificationImage: "",
                 notificationType: "added",
                 notificationAmount: 1,
+                // Required items box
                 showRequiredItems: false,
                 requiredItems: [],
+                // Attachments
                 selectedWeapon: null,
                 showWeaponAttachments: false,
                 selectedWeaponAttachments: [],
+                // Dragging and dropping
                 currentlyDraggingItem: null,
                 currentlyDraggingSlot: null,
                 dragStartX: 0,
@@ -89,11 +110,13 @@ const InventoryContainer = Vue.createApp({
             if (this.showHotbar) {
                 this.toggleHotbar(false);
             }
+
             this.isInventoryOpen = true;
             this.maxWeight = data.maxweight;
             this.totalSlots = data.slots;
             this.playerInventory = {};
             this.otherInventory = {};
+
             if (data.inventory) {
                 if (Array.isArray(data.inventory)) {
                     data.inventory.forEach((item) => {
@@ -110,8 +133,9 @@ const InventoryContainer = Vue.createApp({
                     }
                 }
             }
+
             if (data.other) {
-                if (data.other.inventory) {
+                if (data.other && data.other.inventory) {
                     if (Array.isArray(data.other.inventory)) {
                         data.other.inventory.forEach((item) => {
                             if (item && item.slot) {
@@ -127,16 +151,24 @@ const InventoryContainer = Vue.createApp({
                         }
                     }
                 }
+
                 this.otherInventoryName = data.other.name;
                 this.otherInventoryLabel = data.other.label;
                 this.otherInventoryMaxWeight = data.other.maxweight;
                 this.otherInventorySlots = data.other.slots;
-                this.isShopInventory = this.otherInventoryName.startsWith("shop-");
+
+                if (this.otherInventoryName.startsWith("shop-")) {
+                    this.isShopInventory = true;
+                } else {
+                    this.isShopInventory = false;
+                }
+
                 this.isOtherInventoryEmpty = false;
             }
         },
         updateInventory(data) {
             this.playerInventory = {};
+
             if (data.inventory) {
                 if (Array.isArray(data.inventory)) {
                     data.inventory.forEach((item) => {
@@ -154,16 +186,16 @@ const InventoryContainer = Vue.createApp({
                 }
             }
         },
-async closeInventory() {
-    this.clearDragData();
-    let inventoryName = this.otherInventoryName;
-    Object.assign(this, this.getInitialState());
-    try {
-        await axios.post(`https://${GetParentResourceName()}/closeInventory`, { name: inventoryName });
-    } catch (error) {
-        console.error("Error closing inventory:", error);
-    }
-},
+        async closeInventory() {
+            this.clearDragData();
+            let inventoryName = this.otherInventoryName;
+            Object.assign(this, this.getInitialState());
+            try {
+                await axios.post("https://tmg-inventory/CloseInventory", { name: inventoryName });
+            } catch (error) {
+                console.error("Error closing inventory:", error);
+            }
+        },
         clearTransferAmount() {
             this.transferAmount = null;
         },
@@ -184,7 +216,7 @@ async closeInventory() {
             }
         },
         handleMouseDown(event, slot, inventory) {
-            if (event.button === 1) return;
+            if (event.button === 1) return; // skip middle mouse
             event.preventDefault();
             const itemInSlot = this.getItemInSlot(slot, inventory);
             if (event.button === 0) {
@@ -212,22 +244,27 @@ async closeInventory() {
             const maxTargetWeight = sourceInventoryType === "player" ? this.otherInventoryMaxWeight : this.maxWeight;
             const amountToTransfer = this.transferAmount !== null ? this.transferAmount : 1;
             let targetSlot = null;
+
             const sourceItem = sourceInventory[item.slot];
             if (!sourceItem || sourceItem.amount < amountToTransfer) {
                 this.inventoryError(item.slot);
                 return;
             }
+
             const totalWeightAfterTransfer = targetWeight + sourceItem.weight * amountToTransfer;
+
             if (totalWeightAfterTransfer > maxTargetWeight) {
                 this.inventoryError(item.slot);
                 return;
             }
+
             if (item.unique) {
                 targetSlot = this.findNextAvailableSlot(targetInventory);
                 if (targetSlot === null) {
                     this.inventoryError(item.slot);
                     return;
                 }
+
                 const newItem = {
                     ...item,
                     inventory: sourceInventoryType === "player" ? "other" : "player",
@@ -238,17 +275,20 @@ async closeInventory() {
             } else {
                 const targetItemKey = Object.keys(targetInventory).find((key) => targetInventory[key] && targetInventory[key].name === item.name);
                 const targetItem = targetInventory[targetItemKey];
+
                 if (!targetItem) {
                     const newItem = {
                         ...item,
                         inventory: sourceInventoryType === "player" ? "other" : "player",
                         amount: amountToTransfer,
                     };
+
                     targetSlot = this.findNextAvailableSlot(targetInventory);
                     if (targetSlot === null) {
                         this.inventoryError(item.slot);
                         return;
                     }
+
                     targetInventory[targetSlot] = newItem;
                     newItem.slot = targetSlot;
                 } else {
@@ -256,10 +296,13 @@ async closeInventory() {
                     targetSlot = targetItem.slot;
                 }
             }
+
             sourceItem.amount -= amountToTransfer;
+
             if (sourceItem.amount <= 0) {
                 delete sourceInventory[item.slot];
             }
+
             this.postInventoryData(sourceInventoryType, sourceInventoryType === "player" ? "other" : "player", item.slot, targetSlot, sourceItem.amount, amountToTransfer);
         },
         startDrag(event, slot, inventoryType) {
@@ -294,18 +337,23 @@ async closeInventory() {
             return ghostElement;
         },
         drag(event) {
-            if (!this.currentlyDraggingItem || !this.ghostElement) return;
+            if (!this.currentlyDraggingItem) return;
             const centeredX = event.clientX - this.ghostElement.offsetWidth / 2;
             const centeredY = event.clientY - this.ghostElement.offsetHeight / 2;
             this.ghostElement.style.left = `${centeredX}px`;
             this.ghostElement.style.top = `${centeredY}px`;
         },
         endDrag(event) {
-            if (!this.currentlyDraggingItem) return;
+            if (!this.currentlyDraggingItem) {
+                return;
+            }
+
             const elementsUnderCursor = document.elementsFromPoint(event.clientX, event.clientY);
+
             const playerSlotElement = elementsUnderCursor.find((el) => el.classList.contains("item-slot") && el.closest(".player-inventory-section"));
+
             const otherSlotElement = elementsUnderCursor.find((el) => el.classList.contains("item-slot") && el.closest(".other-inventory-section"));
-            
+
             if (playerSlotElement) {
                 const targetSlot = Number(playerSlotElement.dataset.slot);
                 if (targetSlot && !(targetSlot === this.currentlyDraggingSlot && this.dragStartInventoryType === "player")) {
@@ -318,10 +366,12 @@ async closeInventory() {
                 }
             } else if (this.isOtherInventoryEmpty && this.dragStartInventoryType === "player") {
                 const isOverInventoryGrid = elementsUnderCursor.some((el) => el.classList.contains("inventory-grid") || el.classList.contains("item-grid"));
+
                 if (!isOverInventoryGrid) {
                     this.handleDropOnInventoryContainer();
                 }
             }
+
             this.clearDragData();
         },
         handleDropOnPlayerSlot(targetSlot) {
@@ -342,28 +392,33 @@ async closeInventory() {
             this.handleItemDrop("other", targetSlot);
         },
         async handleDropOnInventoryContainer() {
-            if (this.isOtherInventoryEmpty && this.dragStartInventoryType === "player" && this.currentlyDraggingItem) {
-                const fromSlot = this.currentlyDraggingSlot;
+            if (this.isOtherInventoryEmpty && this.dragStartInventoryType === "player") {
                 const newItem = {
                     ...this.currentlyDraggingItem,
                     amount: this.currentlyDraggingItem.amount,
                     slot: 1,
                     inventory: "other",
                 };
+                const draggingItem = this.currentlyDraggingItem;
                 try {
-                    const response = await axios.post(`https://${GetParentResourceName()}/dropItem`, {
+                    const response = await axios.post("https://tmg-inventory/DropItem", {
                         ...newItem,
-                        fromSlot: fromSlot,
+                        fromSlot: this.currentlyDraggingSlot,
                     });
+
                     if (response.data) {
-                        delete this.playerInventory[fromSlot];
                         this.otherInventory[1] = newItem;
+                        const draggingItemKey = Object.keys(this.playerInventory).find((key) => this.playerInventory[key] === draggingItem);
+                        if (draggingItemKey) {
+                            delete this.playerInventory[draggingItemKey];
+                        }
                         this.otherInventoryName = response.data;
                         this.otherInventoryLabel = response.data;
                         this.isOtherInventoryEmpty = false;
+                        this.clearDragData();
                     }
                 } catch (error) {
-                    this.inventoryError(fromSlot);
+                    this.inventoryError(this.currentlyDraggingSlot);
                 }
             }
             this.clearDragData();
@@ -385,34 +440,41 @@ async closeInventory() {
                 if (this.dragStartInventoryType === "other" && targetInventoryType === "other" && isShop !== -1) {
                     return;
                 }
+
                 const targetSlotNumber = parseInt(targetSlot, 10);
                 if (isNaN(targetSlotNumber)) {
                     throw new Error("Invalid target slot number");
                 }
+
                 const sourceInventory = this.getInventoryByType(this.dragStartInventoryType);
                 const targetInventory = this.getInventoryByType(targetInventoryType);
+
                 const sourceItem = sourceInventory[this.currentlyDraggingSlot];
                 if (!sourceItem) {
                     throw new Error("No item in the source slot to transfer");
                 }
+
                 const amountToTransfer = this.transferAmount !== null ? this.transferAmount : sourceItem.amount;
                 if (sourceItem.amount < amountToTransfer) {
                     throw new Error("Insufficient amount of item in source inventory");
                 }
+
                 if (targetInventoryType !== this.dragStartInventoryType) {
-                    if (targetInventoryType === "other") {
+                    if (targetInventoryType == "other") {
                         const totalWeightAfterTransfer = this.otherInventoryWeight + sourceItem.weight * amountToTransfer;
                         if (totalWeightAfterTransfer > this.otherInventoryMaxWeight) {
                             throw new Error("Insufficient weight capacity in target inventory");
                         }
-                    } else if (targetInventoryType === "player") {
+                    } else if (targetInventoryType == "player") {
                         const totalWeightAfterTransfer = this.playerWeight + sourceItem.weight * amountToTransfer;
                         if (totalWeightAfterTransfer > this.maxWeight) {
                             throw new Error("Insufficient weight capacity in player inventory");
                         }
                     }
                 }
+
                 const targetItem = targetInventory[targetSlotNumber];
+
                 if (targetItem) {
                     if (sourceItem.name === targetItem.name && targetItem.unique) {
                         this.inventoryError(this.currentlyDraggingSlot);
@@ -449,7 +511,7 @@ async closeInventory() {
         },
         async handlePurchase(targetSlot, sourceSlot, sourceItem, transferAmount) {
             try {
-                const response = await axios.post(`https://${GetParentResourceName()}/attemptPurchase`, {
+                const response = await axios.post("https://tmg-inventory/AttemptPurchase", {
                     item: sourceItem,
                     amount: transferAmount || sourceItem.amount,
                     shop: this.otherInventoryName,
@@ -494,79 +556,70 @@ async closeInventory() {
                 this.inventoryError(sourceSlot);
             }
         },
-async dropItem(item, quantity) {
-    if (item && item.name) {
-        const slot = item.slot;
-        if (this.playerInventory[slot]) {
-            let amountToGive;
-            if (typeof quantity === "string") {
-                switch (quantity) {
-                    case "half":
-                        amountToGive = Math.ceil(item.amount / 2);
-                        break;
-                    case "all":
-                        amountToGive = item.amount;
-                        break;
-                    default:
+        async dropItem(item, quantity) {
+            if (item && item.name) {
+                const playerItemKey = Object.keys(this.playerInventory).find((key) => this.playerInventory[key] && this.playerInventory[key].slot === item.slot);
+                if (playerItemKey) {
+                    let amountToGive;
+
+                    if (typeof quantity === "string") {
+                        switch (quantity) {
+                            case "half":
+                                amountToGive = Math.ceil(item.amount / 2);
+                                break;
+                            case "all":
+                                amountToGive = item.amount;
+                                break;
+                            default:
+                                console.error("Invalid quantity specified.");
+                                return;
+                        }
+                    } else if (typeof quantity === "number" && quantity > 0) {
+                        amountToGive = quantity;
+                    } else {
+                        console.error("Invalid quantity type specified.");
                         return;
+                    }
+
+                    if (amountToGive > item.amount) {
+                        amountToGive = item.amount;
+                    }
+
+                    const newItem = {
+                        ...item,
+                        amount: amountToGive,
+                        slot: 1,
+                        inventory: "other",
+                    };
+
+                    try {
+                        const response = await axios.post("https://tmg-inventory/DropItem", {
+                            ...newItem,
+                            fromSlot: item.slot,
+                        });
+
+                        if (response.data) {
+                            delete this.playerInventory[playerItemKey];
+                            this.otherInventory[1] = newItem;
+                            this.otherInventoryName = response.data;
+                            this.otherInventoryLabel = response.data;
+                            this.isOtherInventoryEmpty = false;
+                        }
+                    } catch (error) {
+                        this.inventoryError(item.slot);
+                    }
                 }
-            } else if (typeof quantity === "number" && quantity > 0) {
-                amountToGive = quantity;
-            } else {
+            }
+            this.showContextMenu = false;
+        },
+        async useItem(item) {
+            if (!item || item.useable === false) {
                 return;
             }
-            if (amountToGive > item.amount) {
-                amountToGive = item.amount;
-            }
-            const newItem = {
-                ...item,
-                amount: amountToGive,
-                slot: 1,
-                inventory: "other",
-            };
-            try {
-                const response = await axios.post(`https://${GetParentResourceName()}/dropItem`, {
-                    ...newItem,
-                    fromSlot: slot,
-                });
-                if (response.data) {
-                    delete this.playerInventory[slot];
-                    this.otherInventory[1] = newItem;
-                    this.otherInventoryName = response.data;
-                    this.otherInventoryLabel = response.data;
-                    this.isOtherInventoryEmpty = false;
-                } else {
-                    this.inventoryError(slot);
-                }
-            } catch (error) {
-                this.inventoryError(slot);
-            }
-        }
-    }
-    this.showContextMenu = false;
-},
-
-splitAndPlaceItem(item, inventoryType) {
-    const inventoryRef = inventoryType === "player" ? this.playerInventory : this.otherInventory;
-    if (item && item.amount > 1) {
-        const originalSlot = item.slot;
-        if (originalSlot !== undefined && inventoryRef[originalSlot]) {
-            const newItem = { ...item, amount: Math.ceil(item.amount / 2) };
-            const nextSlot = this.findNextAvailableSlot(inventoryRef);
-            if (nextSlot !== null) {
-                inventoryRef[nextSlot] = newItem;
-                inventoryRef[originalSlot] = { ...item, amount: Math.floor(item.amount / 2) };
-                this.postInventoryData(inventoryType, inventoryType, originalSlot, nextSlot, item.amount, newItem.amount);
-            }
-        }
-    }
-    this.showContextMenu = false;
-},
-        async useItem(item) {
-            if (!item || item.useable === false) return;
-            if (this.playerInventory[item.slot]) {
+            const playerItemKey = Object.keys(this.playerInventory).find((key) => this.playerInventory[key] && this.playerInventory[key].slot === item.slot);
+            if (playerItemKey) {
                 try {
-                    await axios.post(`https://${GetParentResourceName()}/useItem`, {
+                    await axios.post("https://tmg-inventory/UseItem", {
                         inventory: "player",
                         item: item,
                     });
@@ -585,10 +638,44 @@ splitAndPlaceItem(item, inventoryType) {
                 this.showContextMenu = false;
                 this.contextMenuItem = null;
             } else {
+                if (item.inventory === "other") {
+                    const matchingItemKey = Object.keys(this.playerInventory).find((key) => this.playerInventory[key].name === item.name);
+                    const matchingItem = this.playerInventory[matchingItemKey];
+
+                    if (matchingItem && matchingItem.unique) {
+                        const newItemKey = Object.keys(this.playerInventory).length + 1;
+                        const newItem = {
+                            ...item,
+                            inventory: "player",
+                            amount: 1,
+                        };
+                        this.playerInventory[newItemKey] = newItem;
+                    } else if (matchingItem) {
+                        matchingItem.amount++;
+                    } else {
+                        const newItemKey = Object.keys(this.playerInventory).length + 1;
+                        const newItem = {
+                            ...item,
+                            inventory: "player",
+                            amount: 1,
+                        };
+                        this.playerInventory[newItemKey] = newItem;
+                    }
+                    item.amount--;
+
+                    if (item.amount <= 0) {
+                        const itemKey = Object.keys(this.otherInventory).find((key) => this.otherInventory[key] === item);
+                        if (itemKey) {
+                            delete this.otherInventory[itemKey];
+                        }
+                    }
+                }
+                const menuLeft = event.clientX;
+                const menuTop = event.clientY;
                 this.showContextMenu = true;
                 this.contextMenuPosition = {
-                    top: `${event.clientY}px`,
-                    left: `${event.clientX}px`,
+                    top: `${menuTop}px`,
+                    left: `${menuLeft}px`,
                 };
                 this.contextMenuItem = item;
             }
@@ -596,7 +683,9 @@ splitAndPlaceItem(item, inventoryType) {
         async giveItem(item, quantity) {
             if (item && item.name) {
                 const selectedItem = item;
-                if (this.playerInventory[selectedItem.slot]) {
+                const playerHasItem = Object.values(this.playerInventory).some((invItem) => invItem && invItem.name === selectedItem.name);
+
+                if (playerHasItem) {
                     let amountToGive;
                     if (typeof quantity === "string") {
                         switch (quantity) {
@@ -613,18 +702,21 @@ splitAndPlaceItem(item, inventoryType) {
                     } else {
                         amountToGive = quantity;
                     }
+
                     if (amountToGive > selectedItem.amount) {
                         console.error("Specified quantity exceeds available amount.");
                         return;
                     }
+
                     try {
-                        const response = await axios.post(`https://${GetParentResourceName()}/giveItem`, {
+                        const response = await axios.post("https://tmg-inventory/GiveItem", {
                             item: selectedItem,
                             amount: amountToGive,
                             slot: selectedItem.slot,
                             info: selectedItem.info,
                         });
                         if (!response.data) return;
+
                         this.playerInventory[selectedItem.slot].amount -= amountToGive;
                         if (this.playerInventory[selectedItem.slot].amount === 0) {
                             delete this.playerInventory[selectedItem.slot];
@@ -632,6 +724,8 @@ splitAndPlaceItem(item, inventoryType) {
                     } catch (error) {
                         console.error("An error occurred while giving the item:", error);
                     }
+                } else {
+                    console.error("Player does not have the item in their inventory. Item cannot be given.");
                 }
             }
             this.showContextMenu = false;
@@ -644,7 +738,22 @@ splitAndPlaceItem(item, inventoryType) {
             }
             return null;
         },
-
+        splitAndPlaceItem(item, inventoryType) {
+            const inventoryRef = inventoryType === "player" ? this.playerInventory : this.otherInventory;
+            if (item && item.amount > 1) {
+                const originalSlot = Object.keys(inventoryRef).find((key) => inventoryRef[key] === item);
+                if (originalSlot !== undefined) {
+                    const newItem = { ...item, amount: Math.ceil(item.amount / 2) };
+                    const nextSlot = this.findNextAvailableSlot(inventoryRef);
+                    if (nextSlot !== null) {
+                        inventoryRef[nextSlot] = newItem;
+                        inventoryRef[originalSlot] = { ...item, amount: Math.floor(item.amount / 2) };
+                        this.postInventoryData(inventoryType, inventoryType, originalSlot, nextSlot, item.amount, newItem.amount);
+                    }
+                }
+            }
+            this.showContextMenu = false;
+        },
         toggleHotbar(data) {
             if (data.open) {
                 this.hotbarItems = data.items;
@@ -680,7 +789,7 @@ splitAndPlaceItem(item, inventoryType) {
             if (slotElement) {
                 slotElement.style.backgroundColor = "red";
             }
-            axios.post(`https://${GetParentResourceName()}/playDropFail`, {}).catch((error) => {
+            axios.post("https://tmg-inventory/PlayDropFail", {}).catch((error) => {
                 console.error("Error playing drop fail:", error);
             });
             setTimeout(() => {
@@ -690,9 +799,11 @@ splitAndPlaceItem(item, inventoryType) {
             }, 1000);
         },
         copySerial() {
-            if (!this.contextMenuItem) return;
+            if (!this.contextMenuItem) {
+                return;
+            }
             const item = this.contextMenuItem;
-            if (item && item.info && item.info.serie) {
+            if (item) {
                 const el = document.createElement("textarea");
                 el.value = item.info.serie;
                 document.body.appendChild(el);
@@ -702,16 +813,20 @@ splitAndPlaceItem(item, inventoryType) {
             }
         },
         openWeaponAttachments() {
-            if (!this.contextMenuItem) return;
+            if (!this.contextMenuItem) {
+                return;
+            }
             if (!this.showWeaponAttachments) {
                 this.selectedWeapon = this.contextMenuItem;
                 this.showWeaponAttachments = true;
                 axios
-                    .post(`https://${GetParentResourceName()}/getWeaponData`, JSON.stringify({ weapon: this.selectedWeapon.name, ItemData: this.selectedWeapon }))
+                    .post("https://tmg-inventory/GetWeaponData", JSON.stringify({ weapon: this.selectedWeapon.name, ItemData: this.selectedWeapon }))
                     .then((response) => {
                         const data = response.data;
-                        if (data && data.AttachmentData && data.AttachmentData.length > 0) {
-                            this.selectedWeaponAttachments = data.AttachmentData;
+                        if (data.AttachmentData !== null && data.AttachmentData !== undefined) {
+                            if (data.AttachmentData.length > 0) {
+                                this.selectedWeaponAttachments = data.AttachmentData;
+                            }
                         }
                     })
                     .catch((error) => {
@@ -724,13 +839,15 @@ splitAndPlaceItem(item, inventoryType) {
             }
         },
         removeAttachment(attachment) {
-            if (!this.selectedWeapon) return;
+            if (!this.selectedWeapon) {
+                return;
+            }
             const index = this.selectedWeaponAttachments.indexOf(attachment);
             if (index !== -1) {
                 this.selectedWeaponAttachments.splice(index, 1);
             }
             axios
-                .post(`https://${GetParentResourceName()}/removeAttachment`, JSON.stringify({ AttachmentData: attachment, WeaponData: this.selectedWeapon }))
+                .post("https://tmg-inventory/RemoveAttachment", JSON.stringify({ AttachmentData: attachment, WeaponData: this.selectedWeapon }))
                 .then((response) => {
                     this.selectedWeapon = response.data.WeaponData;
                     if (response.data.Attachments) {
@@ -748,7 +865,9 @@ splitAndPlaceItem(item, inventoryType) {
                 });
         },
         generateTooltipContent(item) {
-            if (!item) return "";
+            if (!item) {
+                return "";
+            }
             let content = `<div class="custom-tooltip"><div class="tooltip-header">${item.label}</div><hr class="tooltip-divider">`;
             const description = item.info && item.info.description ? item.info.description.replace(/\n/g, "<br>") : item.description ? item.description.replace(/\n/g, "<br>") : "No description available.";
             if (item.info && Object.keys(item.info).length > 0 && item.info.display !== false) {
@@ -770,25 +889,26 @@ splitAndPlaceItem(item, inventoryType) {
         formatKey(key) {
             return key.replace(/_/g, " ").charAt(0).toUpperCase() + key.slice(1);
         },
-postInventoryData(fromInventory, toInventory, fromSlot, toSlot, fromAmount, toAmount) {
-    let fromInventoryName = fromInventory === "other" ? this.otherInventoryName : fromInventory;
-    let toInventoryName = toInventory === "other" ? this.otherInventoryName : toInventory;
-    axios
-        .post(`https://${GetParentResourceName()}/SetInventoryData`, { // <-- Lowercase 's'
-            fromInventory: fromInventoryName,
-            toInventory: toInventoryName,
-            fromSlot,
-            toSlot,
-            fromAmount,
-            toAmount,
-        })
-        .then(() => {
-            this.clearDragData();
-        })
-        .catch((error) => {
-            console.error("Error posting inventory data:", error);
-        });
-},
+        postInventoryData(fromInventory, toInventory, fromSlot, toSlot, fromAmount, toAmount) {
+            let fromInventoryName = fromInventory === "other" ? this.otherInventoryName : fromInventory;
+            let toInventoryName = toInventory === "other" ? this.otherInventoryName : toInventory;
+
+            axios
+                .post("https://tmg-inventory/SetInventoryData", {
+                    fromInventory: fromInventoryName,
+                    toInventory: toInventoryName,
+                    fromSlot,
+                    toSlot,
+                    fromAmount,
+                    toAmount,
+                })
+                .then((response) => {
+                    this.clearDragData();
+                })
+                .catch((error) => {
+                    console.error("Error posting inventory data:", error);
+                });
+        },
     },
     mounted() {
         window.addEventListener("keydown", (event) => {
@@ -799,6 +919,7 @@ postInventoryData(fromInventory, toInventory, fromSlot, toSlot, fromAmount, toAm
                 }
             }
         });
+
         window.addEventListener("message", (event) => {
             switch (event.data.action) {
                 case "open":
@@ -823,6 +944,11 @@ postInventoryData(fromInventory, toInventory, fromSlot, toSlot, fromAmount, toAm
                     console.warn(`Unexpected action: ${event.data.action}`);
             }
         });
+    },
+    beforeUnmount() {
+        window.removeEventListener("mousemove", () => {});
+        window.removeEventListener("keydown", () => {});
+        window.removeEventListener("message", () => {});
     },
 });
 

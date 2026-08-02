@@ -105,7 +105,16 @@ function CloseTrunk()
     SetVehicleDoorShut(vehicle, IsBackEngine(GetEntityModel(vehicle)) and 4 or 5, false)
 end
 
-
+RegisterNetEvent('tmg-inventory:client:openInventory', function(inventory, other)
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = "open",
+        inventory = inventory,
+        other = other,
+        maxweight = Config.MaxWeight,
+        slots = Config.MaxSlots
+    })
+end)
 
 CreateThread(function()
     while true do
@@ -127,7 +136,14 @@ CreateThread(function()
     end
 end)
 
-
+RegisterNetEvent('tmg-inventory:client:ItemBox', function(itemData, type, amount)
+    SendNUIMessage({
+        action = "itemBox",
+        item = itemData,
+        type = type,
+        amount = amount or 1
+    })
+end)
 
 RegisterNetEvent('TMGCore:Client:OnPlayerLoaded', function()
     LocalPlayer.state:set('inv_busy', false, true)
@@ -179,23 +195,87 @@ RegisterNetEvent('tmg-inventory:client:giveAnim', function()
     TaskPlayAnim(PlayerPedId(), 'mp_common', 'givetake1_b', 8.0, 1.0, -1, 16, 0, false, false, false)
 end)
 
-
+RegisterNetEvent('tmg-inventory:client:openInventory', function(inventory, other)
+    local playerPed = PlayerPedId()
+    
+    SetNuiFocus(true, true)
+    
+    SendNUIMessage({
+        action = "open",
+        inventory = inventory,
+        other = other,
+        maxweight = Config.MaxWeight,
+        slots = Config.MaxSlots
+    })
+    
+    RequestAnimDict("pickup_object")
+    while not HasAnimDictLoaded("pickup_object") do Wait(0) end
+    TaskPlayAnim(playerPed, "pickup_object", "putdown_low", 8.0, -8.0, -1, 48, 0, false, false, false)
+end)
 
 RegisterNUICallback('CloseInventory', function(data, cb)
+    local inventoryName = data and data.name
+    
     SetNuiFocus(false, false)
-    if data.name and data.name:find('trunk-') then CloseTrunk() end
-    TriggerServerEvent('tmg-inventory:server:closeInventory', data.name or InvState.CurrentDrop)
-    InvState.CurrentDrop = nil
+    
+    ClearPedTasks(PlayerPedId())
+    
+    if inventoryName and inventoryName ~= "" then
+        TriggerServerEvent('tmg-inventory:server:closeInventory', inventoryName)
+    else
+        TriggerServerEvent('tmg-inventory:server:closeInventory', 'player')
+    end
+    
     cb('ok')
 end)
 
-RegisterNUICallback('GiveItem', function(data, cb)
-    local player, distance = TMGCore.Functions.GetClosestPlayer(GetEntityCoords(PlayerPedId()))
-    if player ~= -1 and distance < 3 then
-        TMGCore.Functions.TriggerCallback('tmg-inventory:server:giveItem', function(success) cb(success) end, GetPlayerServerId(player), data.item.name, data.amount, data.slot, data.info)
-    else TMGCore.Functions.Notify(Lang:t('notify.nonb'), 'error') cb(false) end
+RegisterNUICallback('attemptPurchase', function(data, cb)
+    TMGCore.Functions.TriggerCallback('tmg-inventory:server:attemptPurchase', function(success)
+        cb(success)
+    end, data)
 end)
 
+RegisterNUICallback('playDropFail', function(_, cb)
+    cb('ok')
+end)
+
+-- Weapon Attachments
+RegisterNUICallback('getWeaponData', function(_, cb)
+    cb({ AttachmentData = {} })
+end)
+
+RegisterNUICallback('removeAttachment', function(data, cb)
+    cb({ WeaponData = data and data.WeaponData or {}, Attachments = {}, itemInfo = {} })
+end)
+
+RegisterNUICallback('giveItem', function(data, cb)
+    local closestPlayer, closestDistance = TMGCore.Functions.GetClosestPlayer()
+    if closestPlayer ~= -1 and closestDistance < 3.0 then
+        local targetServerId = GetPlayerServerId(closestPlayer)
+        TMGCore.Functions.TriggerCallback('tmg-inventory:server:giveItem', function(success)
+            cb(success)
+        end, targetServerId, data.item.name, data.amount, data.slot, data.info)
+    else
+        TMGCore.Functions.Notify('No player nearby to give item to!', 'error')
+        cb(false)
+    end
+end)
+local function handleCloseInv(data, cb)
+    local inventoryName = data and data.name
+    SetNuiFocus(false, false)
+    ClearPedTasks(PlayerPedId())
+    
+    if inventoryName and inventoryName ~= "" then
+        TriggerServerEvent('tmg-inventory:server:closeInventory', inventoryName)
+    else
+        TriggerServerEvent('tmg-inventory:server:closeInventory', 'player')
+    end
+    
+    cb('ok')
+end
+
+RegisterNUICallback('closeInventory', handleCloseInv)
+RegisterNUICallback('CloseInventory', handleCloseInv)
 RegisterNUICallback('GetWeaponData', function(cData, cb)
     cb({ WeaponData = TMGCore.Shared.Items[cData.weapon], AttachmentData = FormatWeaponAttachments(cData.ItemData) })
 end)
@@ -219,28 +299,93 @@ RegisterNUICallback('RemoveAttachment', function(data, cb)
     end, data.AttachmentData, WeaponData)
 end)
 
+RegisterNUICallback('useItem', function(data, cb)
+    TriggerServerEvent('tmg-inventory:server:useItem', data.item)
+    cb('ok')
+end)
 
+local function GetTrunkOffset(vehicle)
+    local min, max = GetModelDimensions(GetEntityModel(vehicle))
+    return vector3(0.0, min.y - 0.5, 0.0)
+end
 
 TMGCore.Functions.CreateClientCallback('tmg-inventory:client:vehicleCheck', function(cb)
     local ped = PlayerPedId()
-    local inVeh = GetVehiclePedIsIn(ped, false)
-    if inVeh ~= 0 then cb('glovebox-' .. GetVehicleNumberPlateText(inVeh), GetVehicleClass(inVeh)) return end
+    local coords = GetEntityCoords(ped)
 
-    local veh, dist = TMGCore.Functions.GetClosestVehicle()
-    if veh ~= 0 and dist < 5 then
-        local pos, min, max = GetEntityCoords(ped), GetModelDimensions(GetEntityModel(veh))
-        local trunkpos = GetOffsetFromEntityInWorldCoords(veh, 0.0, IsBackEngine(GetEntityModel(veh)) and max.y or min.y, 0.0)
-        if #(pos - trunkpos) < 1.5 then
-            if GetVehicleDoorLockStatus(veh) < 2 then OpenTrunk(veh) cb('trunk-' .. GetVehicleNumberPlateText(veh), GetVehicleClass(veh))
-            else TMGCore.Functions.Notify(Lang:t('notify.vlocked'), 'error') end
-            return
+    if IsPedInAnyVehicle(ped, false) then
+        local vehicle = GetVehiclePedIsIn(ped, false)
+        local plate = TMGCore.Functions.GetPlate(vehicle)
+        local class = GetVehicleClass(vehicle)
+        cb('glovebox-' .. plate, class)
+    else
+        local vehicle, dist = TMGCore.Functions.GetClosestVehicle(coords)
+        if vehicle ~= 0 and dist < 5.0 then
+            local trunkOffset = GetOffsetFromEntityInWorldCoords(vehicle, GetTrunkOffset(vehicle))
+            local trunkDist = #(coords - trunkOffset)
+
+            if trunkDist < 2.5 then
+                if GetVehicleDoorLockStatus(vehicle) < 2 then
+                    local model = GetEntityModel(vehicle)
+                    -- Door 4 = Hood (Front), Door 5 = Trunk (Rear)
+                    local door = (BackEngineVehicles and BackEngineVehicles[model]) and 4 or 5
+
+                    SetVehicleDoorOpen(vehicle, door, false, false)
+                    local plate = TMGCore.Functions.GetPlate(vehicle)
+                    local class = GetVehicleClass(vehicle)
+
+                    -- Close vehicle door when inventory closes
+                    CreateThread(function()
+                        while LocalPlayer.state.inv_busy do Wait(250) end
+                        SetVehicleDoorShut(vehicle, door, false)
+                    end)
+
+                    cb('trunk-' .. plate, class)
+                else
+                    TMGCore.Functions.Notify("Vehicle is locked!", "error")
+                    cb(false, nil)
+                end
+            else
+                cb(false, nil)
+            end
+        else
+            cb(false, nil)
         end
     end
-    cb(nil)
 end)
+local function handleSetInventoryData(data, cb)
+    TriggerServerEvent('tmg-inventory:server:SetInventoryData', 
+        data.fromInventory, 
+        data.toInventory, 
+        data.fromSlot, 
+        data.toSlot, 
+        data.fromAmount, 
+        data.toAmount
+    )
+    cb('ok')
+end
 
-
-
+RegisterNUICallback('setInventoryData', handleSetInventoryData)
+RegisterNUICallback('SetInventoryData', handleSetInventoryData)
+CreateThread(function()
+    while true do
+        DisableControlAction(0, 37, true) -- Block Control 37 (TAB / INPUT_SELECT_WEAPON)
+        
+        if IsDisabledControlJustPressed(0, 37) then
+            ExecuteCommand('inventory')
+        end
+        Wait(0)
+    end
+end)
+AddEventHandler('playerDropped', function()
+    local src = source
+    SaveInventory(src)
+    for _, inv in pairs(Inventories) do
+        if inv.isOpen == src then
+            inv.isOpen = false
+        end
+    end
+end)
 for i = 1, 5 do
     RegisterCommand('slot_' .. i, function()
         local item = InvState.PlayerData.items[i]
@@ -252,4 +397,5 @@ for i = 1, 5 do
     RegisterKeyMapping('slot_' .. i, Lang:t('inf_mapping.use_item') .. i, 'keyboard', tostring(i))
 end
 
-RegisterKeyMapping('openInv', Lang:t('inf_mapping.opn_inv'), 'keyboard', Config.Keybinds.Open)
+-- Change line 400 to:
+RegisterKeyMapping('openInv', Lang:t('inf_mapping.opn_inv'), 'keyboard', (Config.Keybinds and Config.Keybinds.Open) or Config.OpenKey or 'TAB')

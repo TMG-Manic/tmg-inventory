@@ -1,9 +1,10 @@
 fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
+
 author 'TMG_Manic'
 description 'Player inventory system providing a variety of features for storing and managing items'
-version '1.0.0'
+version '1.2.0'
 
 shared_scripts {
     '@tmg-core/shared/locale.lua',
@@ -13,7 +14,8 @@ shared_scripts {
 }
 
 client_scripts {
-    'client/main.lua'
+    'client/main.lua',
+    'client/drops.lua',
 }
 
 server_scripts {
